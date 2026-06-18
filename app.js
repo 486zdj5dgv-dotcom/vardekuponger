@@ -70,12 +70,32 @@ async function loadTypes(){
 
 async function loadUsers(){
   if(!isAdmin()) return;
+
   const pending = await getDocs(collection(db,"pendingUsers"));
   const users = await getDocs(collection(db,"users"));
   const rows = [];
-  pending.forEach(d => rows.push({ email:d.id, ...d.data(), pending:true }));
-  users.forEach(d => rows.push({ uid:d.id, ...d.data(), pending:false }));
-  $("usersList").innerHTML = rows.map(u => `<div class="item"><div><strong>${u.email}</strong><br><small>${roleNames[u.role]||u.role} ${u.pending?"• väntar på registrering":""}</small></div></div>`).join("");
+
+  pending.forEach(d => rows.push({
+    email: d.id,
+    ...d.data(),
+    pending: true
+  }));
+
+  users.forEach(d => rows.push({
+    email: d.data().email || d.id,
+    uid: d.id,
+    ...d.data(),
+    pending: false
+  }));
+
+  $("usersList").innerHTML = rows.map(u => `
+    <div class="item">
+      <div>
+        <strong>${u.email || "Saknar e-post"}</strong><br>
+        <small>${roleNames[u.role] || u.role} ${u.pending ? "• väntar på registrering" : ""}</small>
+      </div>
+    </div>
+  `).join("");
 }
 
 async function loadCoupons(){
