@@ -41,7 +41,7 @@ function canCreateCoupons(){ return ["admin", "chef"].includes(currentProfile?.r
 function isAdmin(){ return currentProfile?.role === "admin"; }
 
 async function ensureProfile(user){
-  const userRef = doc(db, "users", user.uid);
+  const userRef = doc(db, "users", user.email.toLowerCase());
   const snap = await getDoc(userRef);
   if (snap.exists()) return snap.data();
 
@@ -115,7 +115,7 @@ $("registerBtn").onclick = async () => {
 $("logoutBtn").onclick = () => signOut(auth);
 
 $("makeAdminBtn").onclick = async () => {
-  await setDoc(doc(db,"users",currentUser.uid), { email: currentUser.email.toLowerCase(), role:"admin", active:true, createdAt:serverTimestamp() });
+  await setDoc(doc(db,"users",currentUser.email.toLowerCase()), { email: currentUser.email.toLowerCase(), role:"admin", active:true, createdAt:serverTimestamp() });
   currentProfile = await ensureProfile(currentUser);
   await refresh();
 };
