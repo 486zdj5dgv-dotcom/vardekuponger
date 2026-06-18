@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Värdekuponger</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="loginView" class="login-shell">
+      <div class="login-card">
+        <img src="logo.png" class="logo" alt="Logo" />
+        <h1>Värdekuponger</h1>
+        <p class="muted">Logga in med e-post och lösenord.</p>
+        <input id="email" type="email" placeholder="E-post" autocomplete="email" />
+        <input id="password" type="password" placeholder="Lösenord" autocomplete="current-password" />
+        <button id="loginBtn">Logga in</button>
+        <button id="registerBtn" class="secondary">Registrera testkonto</button>
+        <p id="loginMessage" class="message"></p>
+        <div class="hint">
+          Första kontot som loggar in kan bli admin via knappen som visas efter inloggning.
+        </div>
+      </div>
+    </section>
+
+    <section id="mainView" class="hidden">
+      <header class="topbar">
+        <div class="brand">
+          <img src="logo.png" class="brand-logo" alt="Logo" />
+          <div>
+            <strong>Värdekuponger</strong>
+            <span id="roleBadge">Roll</span>
+          </div>
+        </div>
+        <button id="logoutBtn" class="small">Logga ut</button>
+      </header>
+
+      <nav id="tabs" class="tabs"></nav>
+
+      <main class="container">
+        <section id="setupPanel" class="panel hidden">
+          <h2>Första admin</h2>
+          <p>Om detta är första kontot kan du göra dig själv till admin.</p>
+          <button id="makeAdminBtn">Gör mig till admin</button>
+        </section>
+
+        <section id="checkPanel" class="panel">
+          <h2>Checka / lös in kupong</h2>
+          <div class="form-row">
+            <input id="checkCode" placeholder="Skriv kupongkod, t.ex. MENU-123ABC" />
+            <button id="checkBtn">Checka</button>
+          </div>
+          <div id="couponResult" class="result hidden"></div>
+        </section>
+
+        <section id="createCouponPanel" class="panel hidden">
+          <h2>Skapa kupong</h2>
+          <label>Kupongtyp</label>
+          <select id="couponTypeSelect"></select>
+          <label>Giltig till</label>
+          <input id="expiresAt" type="date" />
+          <button id="createCouponBtn">Skapa kupong</button>
+          <div id="newCouponBox" class="code-box hidden"></div>
+        </section>
+
+        <section id="typesPanel" class="panel hidden">
+          <h2>Kupongtyper</h2>
+          <div class="form-row">
+            <input id="newTypeName" placeholder="Ex. Happy Meal" />
+            <button id="addTypeBtn">Lägg till typ</button>
+          </div>
+          <div id="typesList" class="list"></div>
+        </section>
+
+        <section id="usersPanel" class="panel hidden">
+          <h2>Användare och roller</h2>
+          <p class="muted">Lägg in e-post och roll. Personen registrerar sedan konto med samma e-post.</p>
+          <div class="grid-3">
+            <input id="userEmail" placeholder="namn@exempel.se" />
+            <select id="userRole">
+              <option value="personal">Personal</option>
+              <option value="chef">Chef</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button id="saveUserRoleBtn">Spara roll</button>
+          </div>
+          <div id="usersList" class="list"></div>
+        </section>
+
+        <section id="historyPanel" class="panel hidden">
+          <h2>Senaste kuponger</h2>
+          <div id="couponsList" class="list"></div>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
