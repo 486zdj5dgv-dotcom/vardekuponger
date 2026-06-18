@@ -71,15 +71,8 @@ async function loadTypes(){
 async function loadUsers(){
   if(!isAdmin()) return;
 
-  const pending = await getDocs(collection(db,"pendingUsers"));
   const users = await getDocs(collection(db,"users"));
   const rows = [];
-
-  pending.forEach(d => rows.push({
-    email: d.id,
-    ...d.data(),
-    pending: true
-  }));
 
   users.forEach(d => rows.push({
     email: d.data().email || d.id,
@@ -92,7 +85,7 @@ async function loadUsers(){
     <div class="item">
       <div>
         <strong>${u.email || "Saknar e-post"}</strong><br>
-        <small>${roleNames[u.role] || u.role} ${u.pending ? "• väntar på registrering" : ""}</small>
+        <small>${roleNames[u.role] || u.role}</small>
       </div>
     </div>
   `).join("");
