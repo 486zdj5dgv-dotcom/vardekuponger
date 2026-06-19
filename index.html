@@ -80,19 +80,22 @@
         </section>
 
         <section id="usersPanel" class="panel hidden">
-          <h2>Användare och roller</h2>
-          <p class="muted">Lägg in e-post och roll. Personen registrerar sedan konto med samma e-post.</p>
-          <div class="grid-3">
-            <input id="userEmail" placeholder="namn@exempel.se" />
-            <select id="userRole">
-              <option value="personal">Personal</option>
-              <option value="chef">Chef</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button id="saveUserRoleBtn">Spara roll</button>
-          </div>
-          <div id="usersList" class="list"></div>
-        </section>
+  <h2>Användare och roller</h2>
+  <p class="muted">Lägg in namn, e-post och roll. Personen registrerar sedan konto med samma e-post.</p>
+
+  <div class="grid-3">
+    <input id="userName" placeholder="Namn" />
+    <input id="userEmail" placeholder="namn@exempel.se" />
+    <select id="userRole">
+      <option value="personal">Personal</option>
+      <option value="chef">Chef</option>
+      <option value="admin">Admin</option>
+    </select>
+    <button id="saveUserRoleBtn">Lägg till användare</button>
+  </div>
+
+  <div id="usersList" class="list"></div>
+</section>
 
         <section id="historyPanel" class="panel hidden">
           <h2>Senaste kuponger</h2>
