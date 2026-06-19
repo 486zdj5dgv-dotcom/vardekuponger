@@ -55,7 +55,22 @@ async function ensureProfile(user){
   const userRef = doc(db, "users", email);
   const snap = await getDoc(userRef);
 
-  if (snap.exists()) return snap.data();
+  if (snap.exists()) {
+
+  const profile = snap.data();
+
+  if (profile.active === false) {
+    await signOut(auth);
+    alert("Detta konto är inaktiverat. Kontakta administratör.");
+    return {
+      email,
+      role: "none",
+      active: false
+    };
+  }
+
+  return profile;
+}
 
   const pendingRef = doc(db, "pendingUsers", email);
   const pending = await getDoc(pendingRef);
@@ -122,17 +137,24 @@ async function loadUsers(){
   const usersSnap = await getDocs(collection(db,"users"));
   const pendingSnap = await getDocs(collection(db,"pendingUsers"));
 
-  const rows = [];
+  const activeUsers = [];
+  const inactiveUsers = [];
+  const pendingUsers = [];
 
-  usersSnap.forEach(d => rows.push({
-    email: d.data().email || d.id,
-    name: d.data().name || "",
-    role: d.data().role,
-    active: d.data().active,
-    pending: false
-  }));
+  usersSnap.forEach(d => {
+    const u = {
+      email: d.data().email || d.id,
+      name: d.data().name || "",
+      role: d.data().role,
+      active: d.data().active !== false,
+      pending: false
+    };
 
-  pendingSnap.forEach(d => rows.push({
+    if (u.active) activeUsers.push(u);
+    else inactiveUsers.push(u);
+  });
+
+  pendingSnap.forEach(d => pendingUsers.push({
     email: d.id,
     name: d.data().name || "",
     role: d.data().role,
@@ -140,19 +162,55 @@ async function loadUsers(){
     pending: true
   }));
 
-  $("usersList").innerHTML = rows.map(u => `
-    <div class="item">
-      <div>
-        <strong>${u.name || u.email}</strong><br>
-        <small>
-          ${u.email}<br>
-          ${roleNames[u.role] || u.role}
-          ${u.pending ? " • väntar på registrering" : " • aktiv"}
-        </small>
+  function renderUser(u){
+    return `
+      <div class="item">
+        <div>
+          <strong>${u.name || u.email}</strong><br>
+          <small>
+            ${u.email}<br>
+            ${roleNames[u.role] || u.role}
+            ${u.pending ? " • väntar på registrering" : u.active ? " • aktiv" : " • inaktiv"}
+          </small>
+        </div>
+
+        ${u.pending ? "" : `
+          <button class="${u.active ? "danger" : "secondary"} toggleUserBtn"
+                  data-email="${u.email}"
+                  data-active="${u.active}">
+            ${u.active ? "Inaktivera" : "Aktivera"}
+          </button>
+        `}
       </div>
-    </div>
-  `).join("");
+    `;
+  }
+
+  $("usersList").innerHTML = `
+    <h3>Aktiva användare</h3>
+    ${activeUsers.length ? activeUsers.map(renderUser).join("") : "<p>Inga aktiva användare.</p>"}
+
+    <h3>Väntar på registrering</h3>
+    ${pendingUsers.length ? pendingUsers.map(renderUser).join("") : "<p>Inga väntande användare.</p>"}
+
+    <h3>Inaktiva användare</h3>
+    ${inactiveUsers.length ? inactiveUsers.map(renderUser).join("") : "<p>Inga inaktiva användare.</p>"}
+  `;
 }
+
+document.addEventListener("click", async (e) => {
+  if(!e.target.classList.contains("toggleUserBtn")) return;
+
+  const email = e.target.dataset.email;
+  const isActive = e.target.dataset.active === "true";
+
+  if(!confirm(`${isActive ? "Inaktivera" : "Aktivera"} ${email}?`)) return;
+
+  await updateDoc(doc(db, "users", email), {
+    active: !isActive
+  });
+
+  await loadUsers();
+});
 
 async function loadCoupons(){
   const snap = await getDocs(query(collection(db,"coupons"), orderBy("createdAt", "desc"), limit(30)));
