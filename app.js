@@ -17,6 +17,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
+
 let currentUser = null;
 let currentProfile = null;
 let couponTypes = [];
@@ -61,17 +62,22 @@ async function ensureProfile(user){
 
   if (pending.exists()) {
     const data = pending.data();
+
     const profile = {
       email,
+      name: data.name || email,
       role: data.role,
       active: true,
       createdAt: serverTimestamp()
     };
+
     await setDoc(userRef, profile);
+    await deleteDoc(pendingRef);
+
     return profile;
   }
 
-  return { email, role: "none", active: false };
+  return { email, name: email, role: "none", active: false };
 }
 
 async function loadTypes(){
@@ -84,11 +90,13 @@ async function loadTypes(){
       active: true,
       createdAt: serverTimestamp()
     });
+
     await addDoc(collection(db,"couponTypes"), {
       name: "Cheeseburgare",
       active: true,
       createdAt: serverTimestamp()
     });
+
     return loadTypes();
   }
 
@@ -111,20 +119,36 @@ async function loadTypes(){
 async function loadUsers(){
   if(!isAdmin()) return;
 
-  const users = await getDocs(collection(db,"users"));
+  const usersSnap = await getDocs(collection(db,"users"));
+  const pendingSnap = await getDocs(collection(db,"pendingUsers"));
+
   const rows = [];
 
-  users.forEach(d => rows.push({
+  usersSnap.forEach(d => rows.push({
     email: d.data().email || d.id,
-    uid: d.id,
-    ...d.data()
+    name: d.data().name || "",
+    role: d.data().role,
+    active: d.data().active,
+    pending: false
+  }));
+
+  pendingSnap.forEach(d => rows.push({
+    email: d.id,
+    name: d.data().name || "",
+    role: d.data().role,
+    active: false,
+    pending: true
   }));
 
   $("usersList").innerHTML = rows.map(u => `
     <div class="item">
       <div>
-        <strong>${u.email || "Saknar e-post"}</strong><br>
-        <small>${roleNames[u.role] || u.role}</small>
+        <strong>${u.name || u.email}</strong><br>
+        <small>
+          ${u.email}<br>
+          ${roleNames[u.role] || u.role}
+          ${u.pending ? " • väntar på registrering" : " • aktiv"}
+        </small>
       </div>
     </div>
   `).join("");
@@ -135,11 +159,14 @@ async function loadCoupons(){
 
   $("couponsList").innerHTML = snap.docs.map(d => {
     const c = d.data();
+
     return `
       <div class="item">
         <div>
           <strong>${c.code}</strong><br>
-          <small>${c.typeName} • ${c.redeemed ? "Använd" : "Ej använd"} • Giltig till ${c.expiresAt}</small>
+          <small>
+            ${c.typeName} • ${c.redeemed ? "Använd" : "Ej använd"} • Giltig till ${c.expiresAt}
+          </small>
         </div>
       </div>
     `;
@@ -208,6 +235,7 @@ $("makeAdminBtn").onclick = async () => {
 
   await setDoc(doc(db,"users",email), {
     email,
+    name: currentUser.email,
     role: "admin",
     active: true,
     createdAt: serverTimestamp()
@@ -220,17 +248,22 @@ $("makeAdminBtn").onclick = async () => {
 $("saveUserRoleBtn").onclick = async () => {
   const email = $("userEmail").value.trim().toLowerCase();
   const role = $("userRole").value;
+  const name = $("userName") ? $("userName").value.trim() : "";
 
   if(!email) return;
 
   await setDoc(doc(db,"pendingUsers",email), {
+    email,
+    name,
     role,
-    active: true,
-    updatedAt: serverTimestamp(),
-    updatedBy: currentUser.email
+    active: false,
+    createdAt: serverTimestamp(),
+    createdBy: currentUser.email
   });
 
-  $("userEmail").value = "";
+  if($("userEmail")) $("userEmail").value = "";
+  if($("userName")) $("userName").value = "";
+
   await loadUsers();
 };
 
