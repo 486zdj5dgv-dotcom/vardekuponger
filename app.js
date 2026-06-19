@@ -1,6 +1,29 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  limit,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBYXFLhizk0PprBLJrDugIbPl8rvZxw6NA",
@@ -21,10 +44,28 @@ const $ = (id) => document.getElementById(id);
 let currentUser = null;
 let currentProfile = null;
 let couponTypes = [];
+let allCoupons = [];
 let qrScanner = null;
 
-const panels = ["checkPanel", "createCouponPanel", "typesPanel", "usersPanel", "historyPanel"];
-const roleNames = { admin: "Admin", chef: "Chef", personal: "Personal" };
+const panels = [
+  "dashboardPanel",
+  "checkPanel",
+  "createCouponPanel",
+  "typesPanel",
+  "usersPanel",
+  "historyPanel",
+  "logsPanel"
+];
+
+const roleNames = {
+  admin: "Admin",
+  chef: "Chef",
+  personal: "Personal"
+};
+
+function safeEl(id) {
+  return document.getElementById(id);
+}
 
 function defaultExpiryDate(){
   const d = new Date();
@@ -32,14 +73,13 @@ function defaultExpiryDate(){
   return d.toISOString().slice(0,10);
 }
 
+function todayString(){
+  return new Date().toISOString().slice(0,10);
+}
+
 function makeCode(typeName){
   const prefix = typeName.toUpperCase().replace(/[^A-ZÅÄÖ0-9]/g, "").slice(0,5) || "KUP";
   return `${prefix}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
-}
-
-function showPanel(id){
-  panels.forEach(p => $(p).classList.toggle("hidden", p !== id));
-  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.panel === id));
 }
 
 function canCreateCoupons(){
@@ -50,27 +90,56 @@ function isAdmin(){
   return currentProfile?.role === "admin";
 }
 
+function canViewLogs(){
+  return ["admin", "chef"].includes(currentProfile?.role);
+}
+
+function showPanel(id){
+  panels.forEach(p => {
+    const el = safeEl(p);
+    if(el) el.classList.toggle("hidden", p !== id);
+  });
+
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.panel === id);
+  });
+}
+
+async function writeLog(action, details = {}){
+  try {
+    if(!currentUser) return;
+
+    await addDoc(collection(db, "logs"), {
+      action,
+      details,
+      user: currentUser.email || "okänd",
+      createdAt: serverTimestamp()
+    });
+  } catch(e) {
+    console.warn("Kunde inte skriva logg:", e);
+  }
+}
+
 async function ensureProfile(user){
   const email = user.email.toLowerCase();
   const userRef = doc(db, "users", email);
   const snap = await getDoc(userRef);
 
   if (snap.exists()) {
+    const profile = snap.data();
 
-  const profile = snap.data();
+    if (profile.active === false) {
+      await signOut(auth);
+      alert("Detta konto är inaktiverat. Kontakta administratör.");
+      return {
+        email,
+        role: "none",
+        active: false
+      };
+    }
 
-  if (profile.active === false) {
-    await signOut(auth);
-    alert("Detta konto är inaktiverat. Kontakta administratör.");
-    return {
-      email,
-      role: "none",
-      active: false
-    };
+    return profile;
   }
-
-  return profile;
-}
 
   const pendingRef = doc(db, "pendingUsers", email);
   const pending = await getDoc(pendingRef);
@@ -92,7 +161,12 @@ async function ensureProfile(user){
     return profile;
   }
 
-  return { email, name: email, role: "none", active: false };
+  return {
+    email,
+    name: email,
+    role: "none",
+    active: false
+  };
 }
 
 async function loadTypes(){
@@ -115,24 +189,33 @@ async function loadTypes(){
     return loadTypes();
   }
 
-  $("couponTypeSelect").innerHTML = couponTypes
-    .filter(t => t.active !== false)
-    .map(t => `<option value="${t.id}">${t.name}</option>`)
-    .join("");
+  if(safeEl("couponTypeSelect")){
+    $("couponTypeSelect").innerHTML = couponTypes
+      .filter(t => t.active !== false)
+      .map(t => `<option value="${t.id}">${t.name}</option>`)
+      .join("");
+  }
 
-  $("typesList").innerHTML = couponTypes.map(t => `
-    <div class="item">
-      <div>
-        <strong>${t.name}</strong><br>
-        <small>${t.active === false ? "Inaktiv" : "Aktiv"}</small>
+  if(safeEl("typesList")){
+    $("typesList").innerHTML = couponTypes.map(t => `
+      <div class="item">
+        <div>
+          <strong>${t.name}</strong><br>
+          <small>${t.active === false ? "Inaktiv" : "Aktiv"}</small>
+        </div>
+
+        ${isAdmin() ? `
+          <button class="danger" data-delete-type="${t.id}">
+            Ta bort
+          </button>
+        ` : ""}
       </div>
-      ${isAdmin() ? `<button class="danger" data-delete-type="${t.id}">Ta bort</button>` : ""}
-    </div>
-  `).join("");
+    `).join("");
+  }
 }
 
 async function loadUsers(){
-  if(!isAdmin()) return;
+  if(!isAdmin() || !safeEl("usersList")) return;
 
   const usersSnap = await getDocs(collection(db,"users"));
   const pendingSnap = await getDocs(collection(db,"pendingUsers"));
@@ -142,11 +225,13 @@ async function loadUsers(){
   const pendingUsers = [];
 
   usersSnap.forEach(d => {
+    const data = d.data();
+
     const u = {
-      email: d.data().email || d.id,
-      name: d.data().name || "",
-      role: d.data().role,
-      active: d.data().active !== false,
+      email: data.email || d.id,
+      name: data.name || "",
+      role: data.role,
+      active: data.active !== false,
       pending: false
     };
 
@@ -154,13 +239,17 @@ async function loadUsers(){
     else inactiveUsers.push(u);
   });
 
-  pendingSnap.forEach(d => pendingUsers.push({
-    email: d.id,
-    name: d.data().name || "",
-    role: d.data().role,
-    active: false,
-    pending: true
-  }));
+  pendingSnap.forEach(d => {
+    const data = d.data();
+
+    pendingUsers.push({
+      email: d.id,
+      name: data.name || "",
+      role: data.role,
+      active: false,
+      pending: true
+    });
+  });
 
   function renderUser(u){
     return `
@@ -174,13 +263,25 @@ async function loadUsers(){
           </small>
         </div>
 
-        ${u.pending ? "" : `
-          <button class="${u.active ? "danger" : "secondary"} toggleUserBtn"
-                  data-email="${u.email}"
-                  data-active="${u.active}">
-            ${u.active ? "Inaktivera" : "Aktivera"}
-          </button>
-        `}
+        <div class="actions">
+          ${u.pending ? `
+            <button class="danger deletePendingBtn" data-email="${u.email}">
+              Ta bort
+            </button>
+          ` : `
+            <select class="roleSelect" data-email="${u.email}">
+              <option value="personal" ${u.role === "personal" ? "selected" : ""}>Personal</option>
+              <option value="chef" ${u.role === "chef" ? "selected" : ""}>Chef</option>
+              <option value="admin" ${u.role === "admin" ? "selected" : ""}>Admin</option>
+            </select>
+
+            <button class="${u.active ? "danger" : "secondary"} toggleUserBtn"
+                    data-email="${u.email}"
+                    data-active="${u.active}">
+              ${u.active ? "Inaktivera" : "Aktivera"}
+            </button>
+          `}
+        </div>
       </div>
     `;
   }
@@ -197,48 +298,120 @@ async function loadUsers(){
   `;
 }
 
-document.addEventListener("click", async (e) => {
-  if(!e.target.classList.contains("toggleUserBtn")) return;
-
-  const email = e.target.dataset.email;
-  const isActive = e.target.dataset.active === "true";
-
-  if(!confirm(`${isActive ? "Inaktivera" : "Aktivera"} ${email}?`)) return;
-
-  await updateDoc(doc(db, "users", email), {
-    active: !isActive
-  });
-
-  await loadUsers();
-});
-
 async function loadCoupons(){
-  const snap = await getDocs(query(collection(db,"coupons"), orderBy("createdAt", "desc"), limit(30)));
+  if(!safeEl("couponsList") && !safeEl("statsGrid")) return;
 
-  $("couponsList").innerHTML = snap.docs.map(d => {
-    const c = d.data();
+  const snap = await getDocs(query(collection(db,"coupons"), orderBy("createdAt", "desc"), limit(200)));
 
-    return `
-      <div class="item">
-        <div>
-          <strong>${c.code}</strong><br>
-          <small>
-            ${c.typeName} • ${c.redeemed ? "Använd" : "Ej använd"} • Giltig till ${c.expiresAt}
-          </small>
-        </div>
+  allCoupons = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  renderCoupons();
+  renderDashboard();
+}
+
+function renderCoupons(){
+  if(!safeEl("couponsList")) return;
+
+  const search = (safeEl("couponSearch")?.value || "").trim().toUpperCase();
+
+  const filtered = allCoupons.filter(c =>
+    !search ||
+    (c.code || "").toUpperCase().includes(search) ||
+    (c.typeName || "").toUpperCase().includes(search)
+  );
+
+  $("couponsList").innerHTML = filtered.map(c => `
+    <div class="item">
+      <div>
+        <strong>${c.code}</strong><br>
+        <small>
+          ${c.typeName}<br>
+          ${c.redeemed ? "Använd" : "Ej använd"} • Giltig till ${c.expiresAt}<br>
+          Skapad av: ${c.createdBy || "okänd"}<br>
+          ${c.redeemed ? `Inlöst av: ${c.redeemedBy || "okänd"}` : ""}
+        </small>
       </div>
-    `;
-  }).join("");
+    </div>
+  `).join("");
+}
+
+function renderDashboard(){
+  if(!safeEl("statsGrid")) return;
+
+  const today = todayString();
+
+  const active = allCoupons.filter(c => !c.redeemed && c.expiresAt >= today).length;
+  const redeemed = allCoupons.filter(c => c.redeemed).length;
+  const expired = allCoupons.filter(c => !c.redeemed && c.expiresAt < today).length;
+  const total = allCoupons.length;
+
+  $("statsGrid").innerHTML = `
+    <div class="stat-card">
+      <strong>${active}</strong>
+      <span>Aktiva kuponger</span>
+    </div>
+    <div class="stat-card">
+      <strong>${redeemed}</strong>
+      <span>Inlösta kuponger</span>
+    </div>
+    <div class="stat-card">
+      <strong>${expired}</strong>
+      <span>Utgångna kuponger</span>
+    </div>
+    <div class="stat-card">
+      <strong>${total}</strong>
+      <span>Totalt skapade</span>
+    </div>
+  `;
+}
+
+async function loadLogs(){
+  if(!canViewLogs() || !safeEl("logsList")) return;
+
+  try {
+    const snap = await getDocs(query(collection(db,"logs"), orderBy("createdAt", "desc"), limit(50)));
+
+    $("logsList").innerHTML = snap.docs.map(d => {
+      const l = d.data();
+
+      return `
+        <div class="item">
+          <div>
+            <strong>${l.action}</strong><br>
+            <small>
+              ${l.user || "okänd"}<br>
+              ${JSON.stringify(l.details || {})}
+            </small>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch(e) {
+    $("logsList").innerHTML = `<p>Kunde inte läsa loggen: ${e.message}</p>`;
+  }
 }
 
 function renderTabs(){
-  const tabs = [{ id:"checkPanel", label:"Checka" }];
+  const tabs = [
+    { id:"checkPanel", label:"Checka" }
+  ];
+
+  if(safeEl("dashboardPanel")) {
+    tabs.unshift({ id:"dashboardPanel", label:"Dashboard" });
+  }
 
   if(canCreateCoupons()) {
     tabs.push(
       { id:"createCouponPanel", label:"Skapa kupong" },
       { id:"historyPanel", label:"Kuponger" }
     );
+
+    if(safeEl("logsPanel")) {
+      tabs.push({ id:"logsPanel", label:"Logg" });
+    }
   }
 
   if(isAdmin()) {
@@ -268,10 +441,12 @@ async function refresh(){
   await loadTypes();
   await loadUsers();
   await loadCoupons();
+  await loadLogs();
 }
 
 $("loginBtn").onclick = async () => {
   try {
+    $("loginMessage").textContent = "";
     await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
   } catch(e) {
     $("loginMessage").textContent = e.message;
@@ -280,11 +455,46 @@ $("loginBtn").onclick = async () => {
 
 $("registerBtn").onclick = async () => {
   try {
-    await createUserWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
+    $("loginMessage").textContent = "";
+
+    const email = $("email").value.trim().toLowerCase();
+    const password = $("password").value;
+
+    if(!email || !password) {
+      $("loginMessage").textContent = "Skriv e-post och lösenord. Lösenordet måste vara minst 6 tecken.";
+      return;
+    }
+
+    const pending = await getDoc(doc(db, "pendingUsers", email));
+
+    if(!pending.exists()) {
+      $("loginMessage").textContent = "Din e-post är inte tillagd av admin ännu.";
+      return;
+    }
+
+    await createUserWithEmailAndPassword(auth, email, password);
   } catch(e) {
     $("loginMessage").textContent = e.message;
   }
 };
+
+if(safeEl("resetPasswordBtn")){
+  $("resetPasswordBtn").onclick = async () => {
+    const email = $("email").value.trim();
+
+    if(!email) {
+      $("loginMessage").textContent = "Skriv in din e-post först.";
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      $("loginMessage").textContent = "Återställningsmail skickat.";
+    } catch(e) {
+      $("loginMessage").textContent = e.message;
+    }
+  };
+}
 
 $("logoutBtn").onclick = () => signOut(auth);
 
@@ -300,13 +510,15 @@ $("makeAdminBtn").onclick = async () => {
   });
 
   currentProfile = await ensureProfile(currentUser);
+
+  await writeLog("Gjorde sig själv till admin", { email });
   await refresh();
 };
 
 $("saveUserRoleBtn").onclick = async () => {
   const email = $("userEmail").value.trim().toLowerCase();
   const role = $("userRole").value;
-  const name = $("userName") ? $("userName").value.trim() : "";
+  const name = safeEl("userName") ? $("userName").value.trim() : "";
 
   if(!email) return;
 
@@ -319,11 +531,57 @@ $("saveUserRoleBtn").onclick = async () => {
     createdBy: currentUser.email
   });
 
-  if($("userEmail")) $("userEmail").value = "";
-  if($("userName")) $("userName").value = "";
+  if(safeEl("userEmail")) $("userEmail").value = "";
+  if(safeEl("userName")) $("userName").value = "";
 
+  await writeLog("Lade till väntande användare", { email, role });
   await loadUsers();
+  await loadLogs();
 };
+
+document.addEventListener("click", async (e) => {
+  if(e.target.classList.contains("toggleUserBtn")) {
+    const email = e.target.dataset.email;
+    const isActive = e.target.dataset.active === "true";
+
+    if(!confirm(`${isActive ? "Inaktivera" : "Aktivera"} ${email}?`)) return;
+
+    await updateDoc(doc(db, "users", email), {
+      active: !isActive
+    });
+
+    await writeLog(isActive ? "Inaktiverade användare" : "Aktiverade användare", { email });
+    await loadUsers();
+    await loadLogs();
+  }
+
+  if(e.target.classList.contains("deletePendingBtn")) {
+    const email = e.target.dataset.email;
+
+    if(!confirm(`Ta bort väntande användare ${email}?`)) return;
+
+    await deleteDoc(doc(db, "pendingUsers", email));
+
+    await writeLog("Tog bort väntande användare", { email });
+    await loadUsers();
+    await loadLogs();
+  }
+});
+
+document.addEventListener("change", async (e) => {
+  if(!e.target.classList.contains("roleSelect")) return;
+
+  const email = e.target.dataset.email;
+  const role = e.target.value;
+
+  await updateDoc(doc(db, "users", email), {
+    role
+  });
+
+  await writeLog("Ändrade roll", { email, role });
+  await loadUsers();
+  await loadLogs();
+});
 
 $("addTypeBtn").onclick = async () => {
   const name = $("newTypeName").value.trim();
@@ -338,7 +596,10 @@ $("addTypeBtn").onclick = async () => {
   });
 
   $("newTypeName").value = "";
+
+  await writeLog("Skapade kupongtyp", { name });
   await loadTypes();
+  await loadLogs();
 };
 
 $("typesList").onclick = async (e) => {
@@ -346,7 +607,10 @@ $("typesList").onclick = async (e) => {
 
   if(id && confirm("Ta bort kupongtypen?")) {
     await deleteDoc(doc(db,"couponTypes",id));
+
+    await writeLog("Tog bort kupongtyp", { id });
     await loadTypes();
+    await loadLogs();
   }
 };
 
@@ -389,7 +653,9 @@ $("createCouponBtn").onclick = async () => {
     </div>
   `;
 
+  await writeLog("Skapade kupong", { code, typeName: type.name });
   await loadCoupons();
+  await loadLogs();
 };
 
 $("scanQrBtn").onclick = async () => {
@@ -453,7 +719,7 @@ $("checkBtn").onclick = async () => {
   }
 
   const c = snap.data();
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayString();
 
   if(c.redeemed) {
     box.classList.add("bad");
@@ -480,10 +746,18 @@ $("checkBtn").onclick = async () => {
       redeemedBy: currentUser.email
     });
 
+    await writeLog("Löste in kupong", { code, typeName: c.typeName });
+
     box.innerHTML = `✅ Kupongen är nu inlöst: <strong>${c.typeName}</strong>`;
+
     await loadCoupons();
+    await loadLogs();
   };
 };
+
+if(safeEl("couponSearch")){
+  $("couponSearch").oninput = renderCoupons;
+}
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
@@ -493,7 +767,11 @@ onAuthStateChanged(auth, async (user) => {
 
   if(user) {
     currentProfile = await ensureProfile(user);
+
+    if(currentProfile.active === false) return;
+
     $("expiresAt").value = defaultExpiryDate();
+
     await refresh();
 
     const params = new URLSearchParams(window.location.search);
