@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Värdekuponger</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b5f3a" />
 </head>
 <body>
   <div id="app">
@@ -17,10 +19,9 @@
         <input id="password" type="password" placeholder="Lösenord" autocomplete="current-password" />
         <button id="loginBtn">Logga in</button>
         <button id="registerBtn" class="secondary">Registrera konto</button>
+        <button id="resetPasswordBtn" class="ghost">Glömt lösenord?</button>
         <p id="loginMessage" class="message"></p>
-        <div class="hint">
-          Första kontot som loggar in kan bli admin via knappen som visas efter inloggning.
-        </div>
+        <div class="hint">Admin lägger först till användaren. Personen registrerar sedan konto med samma e-post.</div>
       </div>
     </section>
 
@@ -28,10 +29,7 @@
       <header class="topbar">
         <div class="brand">
           <img src="logo.png" class="brand-logo" alt="Logo" />
-          <div>
-            <strong>Värdekuponger</strong>
-            <span id="roleBadge">Roll</span>
-          </div>
+          <div><strong>Värdekuponger</strong><span id="roleBadge">Roll</span></div>
         </div>
         <button id="logoutBtn" class="small">Logga ut</button>
       </header>
@@ -45,20 +43,21 @@
           <button id="makeAdminBtn">Gör mig till admin</button>
         </section>
 
+        <section id="dashboardPanel" class="panel hidden">
+          <h2>Dashboard</h2>
+          <div id="statsGrid" class="stats-grid"></div>
+        </section>
+
         <section id="checkPanel" class="panel">
-  <h2>Checka / lös in kupong</h2>
-
-  <div class="form-row">
-    <input id="checkCode" placeholder="Skriv kupongkod, t.ex. MENU-123ABC" />
-    <button id="checkBtn">Checka</button>
-  </div>
-
-  <button id="scanQrBtn" type="button">Skanna QR-kod</button>
-
-  <div id="qrReader" class="hidden" style="margin-top:15px;"></div>
-
-  <div id="couponResult" class="result hidden"></div>
-</section>
+          <h2>Checka / lös in kupong</h2>
+          <button id="scanQrBtn" type="button" class="scan-main">📷 Skanna QR-kod</button>
+          <div class="form-row">
+            <input id="checkCode" placeholder="Skriv kupongkod, t.ex. MENU-123ABC" />
+            <button id="checkBtn">Checka</button>
+          </div>
+          <div id="qrReader" class="hidden qr-reader"></div>
+          <div id="couponResult" class="result hidden"></div>
+        </section>
 
         <section id="createCouponPanel" class="panel hidden">
           <h2>Skapa kupong</h2>
@@ -80,33 +79,36 @@
         </section>
 
         <section id="usersPanel" class="panel hidden">
-  <h2>Användare och roller</h2>
-  <p class="muted">Lägg in namn, e-post och roll. Personen registrerar sedan konto med samma e-post.</p>
-
-  <div class="grid-3">
-    <input id="userName" placeholder="Namn" />
-    <input id="userEmail" placeholder="namn@exempel.se" />
-    <select id="userRole">
-      <option value="personal">Personal</option>
-      <option value="chef">Chef</option>
-      <option value="admin">Admin</option>
-    </select>
-    <button id="saveUserRoleBtn">Lägg till användare</button>
-  </div>
-
-  <div id="usersList" class="list"></div>
-</section>
+          <h2>Användare och roller</h2>
+          <p class="muted">Lägg in namn, e-post och roll. Personen registrerar sedan konto med samma e-post.</p>
+          <div class="grid-4">
+            <input id="userName" placeholder="Namn" />
+            <input id="userEmail" placeholder="namn@exempel.se" />
+            <select id="userRole">
+              <option value="personal">Personal</option>
+              <option value="chef">Chef</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button id="saveUserRoleBtn">Lägg till användare</button>
+          </div>
+          <div id="usersList" class="list"></div>
+        </section>
 
         <section id="historyPanel" class="panel hidden">
-          <h2>Senaste kuponger</h2>
+          <h2>Kuponger</h2>
+          <input id="couponSearch" placeholder="Sök kupongkod..." />
           <div id="couponsList" class="list"></div>
+        </section>
+
+        <section id="logsPanel" class="panel hidden">
+          <h2>Aktivitetslogg</h2>
+          <div id="logsList" class="list"></div>
         </section>
       </main>
     </section>
   </div>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script type="module" src="app.js"></script>
-
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
