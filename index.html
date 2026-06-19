@@ -46,13 +46,19 @@
         </section>
 
         <section id="checkPanel" class="panel">
-          <h2>Checka / lös in kupong</h2>
-          <div class="form-row">
-            <input id="checkCode" placeholder="Skriv kupongkod, t.ex. MENU-123ABC" />
-            <button id="checkBtn">Checka</button>
-          </div>
-          <div id="couponResult" class="result hidden"></div>
-        </section>
+  <h2>Checka / lös in kupong</h2>
+
+  <div class="form-row">
+    <input id="checkCode" placeholder="Skriv kupongkod, t.ex. MENU-123ABC" />
+    <button id="checkBtn">Checka</button>
+  </div>
+
+  <button id="scanQrBtn" type="button">Skanna QR-kod</button>
+
+  <div id="qrReader" class="hidden" style="margin-top:15px;"></div>
+
+  <div id="couponResult" class="result hidden"></div>
+</section>
 
         <section id="createCouponPanel" class="panel hidden">
           <h2>Skapa kupong</h2>
@@ -96,6 +102,8 @@
     </section>
   </div>
 
-  <script type="module" src="app.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script type="module" src="app.js"></script>
+
 </body>
 </html>
